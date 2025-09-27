@@ -1,0 +1,287 @@
+[
+  {
+    "inputs": [
+      { "internalType": "address", "name": "_pyusd", "type": "address" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "repoName",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "developerGithub",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "prNumber",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "BountyPaid",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "githubUsername",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "wallet",
+        "type": "address"
+      }
+    ],
+    "name": "DeveloperRegistered",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "repoName",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "FundsDeposited",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "string",
+        "name": "repoName",
+        "type": "string"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "maintainer",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "bountyAmount",
+        "type": "uint256"
+      }
+    ],
+    "name": "RepositoryRegistered",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "repoName", "type": "string" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "depositFunds",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "string", "name": "", "type": "string" }],
+    "name": "developers",
+    "outputs": [
+      { "internalType": "address", "name": "wallet", "type": "address" },
+      { "internalType": "string", "name": "githubUsername", "type": "string" },
+      { "internalType": "uint256", "name": "totalEarned", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "githubUsername", "type": "string" }
+    ],
+    "name": "getDeveloper",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "address", "name": "wallet", "type": "address" },
+          {
+            "internalType": "string",
+            "name": "githubUsername",
+            "type": "string"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalEarned",
+            "type": "uint256"
+          }
+        ],
+        "internalType": "struct PayPR.Developer",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "id", "type": "uint256" }],
+    "name": "getPayment",
+    "outputs": [
+      {
+        "components": [
+          { "internalType": "string", "name": "repoName", "type": "string" },
+          {
+            "internalType": "string",
+            "name": "developerGithub",
+            "type": "string"
+          },
+          { "internalType": "uint256", "name": "prNumber", "type": "uint256" },
+          { "internalType": "uint256", "name": "amount", "type": "uint256" },
+          { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+        ],
+        "internalType": "struct PayPR.Payment",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "repoName", "type": "string" }
+    ],
+    "name": "getRepository",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "maintainer",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "bountyAmount",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "totalFunds",
+            "type": "uint256"
+          },
+          { "internalType": "bool", "name": "active", "type": "bool" }
+        ],
+        "internalType": "struct PayPR.Repository",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "paymentCounter",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "name": "payments",
+    "outputs": [
+      { "internalType": "string", "name": "repoName", "type": "string" },
+      { "internalType": "string", "name": "developerGithub", "type": "string" },
+      { "internalType": "uint256", "name": "prNumber", "type": "uint256" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" },
+      { "internalType": "uint256", "name": "timestamp", "type": "uint256" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "repoName", "type": "string" },
+      { "internalType": "string", "name": "developerGithub", "type": "string" },
+      { "internalType": "uint256", "name": "prNumber", "type": "uint256" }
+    ],
+    "name": "processPRPayment",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "pyusd",
+    "outputs": [
+      { "internalType": "contract IERC20", "name": "", "type": "address" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "githubUsername", "type": "string" }
+    ],
+    "name": "registerDeveloper",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "string", "name": "repoName", "type": "string" },
+      { "internalType": "uint256", "name": "bountyAmount", "type": "uint256" }
+    ],
+    "name": "registerRepository",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "string", "name": "", "type": "string" }],
+    "name": "repositories",
+    "outputs": [
+      { "internalType": "address", "name": "maintainer", "type": "address" },
+      { "internalType": "uint256", "name": "bountyAmount", "type": "uint256" },
+      { "internalType": "uint256", "name": "totalFunds", "type": "uint256" },
+      { "internalType": "bool", "name": "active", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

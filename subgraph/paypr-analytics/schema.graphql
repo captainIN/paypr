@@ -1,0 +1,38 @@
+type BountyPaid @entity(immutable: true) {
+  id: Bytes!
+  repoName: String! # string
+  developerGithub: String! # string
+  prNumber: BigInt! # uint256
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type DeveloperRegistered @entity(immutable: true) {
+  id: Bytes!
+  githubUsername: String! # string
+  wallet: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type FundsDeposited @entity(immutable: true) {
+  id: Bytes!
+  repoName: String! # string
+  amount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type RepositoryRegistered @entity(immutable: true) {
+  id: Bytes!
+  repoName: String! # string
+  maintainer: Bytes! # address
+  bountyAmount: BigInt! # uint256
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
