@@ -52,6 +52,35 @@ export default function Analytics() {
     return new Date(parseInt(timestamp) * 1000).toLocaleDateString();
   };
 
+  const decodeString = (encodedString: string) => {
+    try {
+      // If it's already readable text, return as is
+      if (/^[a-zA-Z0-9\-_/.]+$/.test(encodedString)) {
+        return encodedString;
+      }
+
+      // Try to decode from bytes if it's encoded
+      if (encodedString.startsWith('0x')) {
+        return ethers.toUtf8String(encodedString);
+      }
+
+      // If it looks like bytes but without 0x prefix
+      const hexString = encodedString.replace(/[^a-fA-F0-9]/g, '');
+      if (hexString.length > 0 && hexString.length % 2 === 0) {
+        try {
+          return ethers.toUtf8String('0x' + hexString);
+        } catch {
+          return encodedString; // Return original if decode fails
+        }
+      }
+
+      return encodedString;
+    } catch (error) {
+      console.log('String decode failed:', error);
+      return encodedString; // Return original string if decoding fails
+    }
+  };
+
   const getTotalPayouts = () => {
     if (!overviewData?.bountyPaids) return '0.00';
     const total = overviewData.bountyPaids.reduce((sum: number, payment: any) => {
@@ -102,145 +131,158 @@ export default function Analytics() {
       </header>
 
       <div className="container">
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.1)',
-          padding: '2rem',
-          borderRadius: '12px',
-          textAlign: 'center',
-          marginBottom: '2rem'
-        }}>
-          <h1 style={{ margin: '0 0 1rem 0', fontSize: '2.5rem', color: '#FFD700' }}>📊 PayPR Analytics</h1>
-          <p style={{ margin: '0', fontSize: '1.1rem', opacity: 0.9 }}>
-            Real-time blockchain analytics powered by The Graph Protocol
-          </p>
-        </div>
+
 
         {/* Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500">Total Payouts</h3>
-            <p className="text-2xl font-bold text-green-600">${getTotalPayouts()} PYUSD</p>
+        <div className="stats-section">
+          <div className="stat-card">
+            <h4>💰 Total Payouts</h4>
+            <div className="stat-number" style={{ color: '#4CAF50' }}>{getTotalPayouts()}</div>
+            <div className="stat-total">PYUSD Distributed</div>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500">Total Developers</h3>
-            <p className="text-2xl font-bold text-blue-600">{overviewData?.developerRegistereds?.length || 0}</p>
+          <div className="stat-card">
+            <h4>👨‍💻 Active Developers</h4>
+            <div className="stat-number" style={{ color: '#2196F3' }}>{overviewData?.developerRegistereds?.length || 0}</div>
+            <div className="stat-total">Registered Contributors</div>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500">Total Repositories</h3>
-            <p className="text-2xl font-bold text-purple-600">{overviewData?.repositoryRegistereds?.length || 0}</p>
+          <div className="stat-card">
+            <h4>📁 Repositories</h4>
+            <div className="stat-number" style={{ color: '#9C27B0' }}>{overviewData?.repositoryRegistereds?.length || 0}</div>
+            <div className="stat-total">Active Projects</div>
           </div>
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-medium text-gray-500">Total Payments</h3>
-            <p className="text-2xl font-bold text-orange-600">{overviewData?.bountyPaids?.length || 0}</p>
+          <div className="stat-card">
+            <h4>🎯 Total Payments</h4>
+            <div className="stat-number" style={{ color: '#FF9800' }}>{overviewData?.bountyPaids?.length || 0}</div>
+            <div className="stat-total">Successful Merges</div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem', marginBottom: '2rem' }}>
           {/* Recent Payments */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Recent Payments</h2>
-            </div>
-            <div className="p-6">
-              {paymentsLoading ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                </div>
-              ) : paymentsData?.bountyPaids?.length > 0 ? (
-                <div className="space-y-4">
-                  {paymentsData.bountyPaids.slice(0, 5).map((payment: Payment) => (
-                    <div key={payment.id} className="flex justify-between items-center py-3 border-b border-gray-100 last:border-b-0">
+          <div className="payments-section">
+            <h3>💳 Recent Payments</h3>
+            {paymentsLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <div style={{
+                  width: '30px',
+                  height: '30px',
+                  border: '3px solid rgba(255,255,255,0.3)',
+                  borderTop: '3px solid #fff',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  margin: '0 auto'
+                }}></div>
+              </div>
+            ) : paymentsData?.bountyPaids?.length > 0 ? (
+              <div className="payments-list">
+                {paymentsData.bountyPaids.slice(0, 8).map((payment: Payment) => (
+                  <div key={payment.id} className="payment-card">
+                    <div className="payment-header">
+                      <span className="payment-amount">
+                        ${formatAmount(payment.amount)} PYUSD
+                      </span>
+                      <span className="payment-time">
+                        {formatDate(payment.blockTimestamp)}
+                      </span>
+                    </div>
+                    <div className="payment-details">
+                      <div>👨‍💻 {decodeString(payment.developerGithub)}</div>
+                      <div>📁 {decodeString(payment.repoName)}</div>
+                      <div>🔗 PR #{payment.prNumber}</div>
                       <div>
-                        <p className="font-medium text-gray-900">{payment.developerGithub}</p>
-                        <p className="text-sm text-gray-500">{payment.repoName} - PR #{payment.prNumber}</p>
-                        <p className="text-xs text-gray-400">{formatDate(payment.blockTimestamp)}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-green-600">${formatAmount(payment.amount)} PYUSD</p>
                         <a
                           href={`https://sepolia.arbiscan.io/tx/${payment.transactionHash}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-500 hover:underline"
                         >
-                          View tx
+                          View Transaction
                         </a>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-center py-8">No payments yet</p>
-              )}
-            </div>
-          </div>
-
-          {/* Developer Leaderboard */}
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">Registered Developers</h2>
-            </div>
-            <div className="p-6">
-              {developersLoading ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                </div>
-              ) : developersData?.developerRegistereds?.length > 0 ? (
-                <div className="space-y-4">
-                  {developersData.developerRegistereds.slice(0, 5).map((developer: Developer, index: number) => (
-                    <div key={developer.id} className="flex items-center space-x-3 py-3 border-b border-gray-100 last:border-b-0">
-                      <div className="flex-shrink-0">
-                        <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-blue-600">#{index + 1}</span>
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">{developer.githubUsername}</p>
-                        <p className="text-sm text-gray-500">{developer.wallet.slice(0, 6)}...{developer.wallet.slice(-4)}</p>
-                        <p className="text-xs text-gray-400">Joined {formatDate(developer.blockTimestamp)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-center py-8">No developers registered yet</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Repository Stats */}
-        <div className="mt-8 bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Registered Repositories</h2>
-          </div>
-          <div className="p-6">
-            {reposLoading ? (
-              <div className="text-center py-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              </div>
-            ) : reposData?.repositoryRegistereds?.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {reposData.repositoryRegistereds.map((repo: Repository) => (
-                  <div key={repo.id} className="border border-gray-200 rounded-lg p-4">
-                    <h3 className="font-medium text-gray-900 mb-2">{repo.repoName}</h3>
-                    <p className="text-sm text-gray-600 mb-2">
-                      Maintainer: {repo.maintainer.slice(0, 6)}...{repo.maintainer.slice(-4)}
-                    </p>
-                    <p className="text-sm font-medium text-green-600 mb-2">
-                      Bounty: ${formatAmount(repo.bountyAmount)} PYUSD
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      Registered {formatDate(repo.blockTimestamp)}
-                    </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500 text-center py-8">No repositories registered yet</p>
+              <p className="no-data">No payments recorded yet</p>
+            )}
+          </div>
+
+          {/* Developer Leaderboard */}
+          <div className="payments-section">
+            <h3>👨‍💻 Registered Developers</h3>
+            {developersLoading ? (
+              <div style={{ textAlign: 'center', padding: '2rem' }}>
+                <div style={{
+                  width: '30px',
+                  height: '30px',
+                  border: '3px solid rgba(255,255,255,0.3)',
+                  borderTop: '3px solid #fff',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  margin: '0 auto'
+                }}></div>
+              </div>
+            ) : developersData?.developerRegistereds?.length > 0 ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                {developersData.developerRegistereds.slice(0, 8).map((developer: Developer, index: number) => (
+                  <div key={developer.id} className="stat-card">
+                    <h4>#{index + 1} {decodeString(developer.githubUsername)}</h4>
+                    <div className="stat-item">
+                      📱 {developer.wallet.slice(0, 6)}...{developer.wallet.slice(-4)}
+                    </div>
+                    <div className="stat-item">
+                      📅 Joined {formatDate(developer.blockTimestamp)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="no-data">No developers registered yet</p>
             )}
           </div>
         </div>
+
+        {/* Repository Stats */}
+        <div className="payments-section">
+          <h3>📁 Registered Repositories</h3>
+          {reposLoading ? (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <div style={{
+                width: '30px',
+                height: '30px',
+                border: '3px solid rgba(255,255,255,0.3)',
+                borderTop: '3px solid #fff',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
+                margin: '0 auto'
+              }}></div>
+            </div>
+          ) : reposData?.repositoryRegistereds?.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem' }}>
+              {reposData.repositoryRegistereds.map((repo: Repository) => (
+                <div key={repo.id} className="stat-card">
+                  <h4>📁 {decodeString(repo.repoName)}</h4>
+                  <div className="stat-item">
+                    👨‍💻 {repo.maintainer.slice(0, 6)}...{repo.maintainer.slice(-4)}
+                  </div>
+                  <div className="stat-item" style={{ color: '#4CAF50', fontWeight: 'bold' }}>
+                    💰 ${formatAmount(repo.bountyAmount)} PYUSD per PR
+                  </div>
+                  <div className="stat-item">
+                    📅 Registered {formatDate(repo.blockTimestamp)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="no-data">No repositories registered yet</p>
+          )}
+        </div>
+
+        <footer className="footer">
+          <p>🔗 Powered by The Graph Protocol on Arbitrum Sepolia</p>
+          <p>Real-time data from blockchain events</p>
+        </footer>
       </div>
     </div>
   );
