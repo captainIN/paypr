@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import GraphApolloProvider from '../components/ApolloProvider'
 
 export const metadata: Metadata = {
   title: 'PayPR - Automated PYUSD Payments for GitHub PRs',
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <div id="root">{children}</div>
+        <GraphApolloProvider>
+          <div id="root">{children}</div>
+        </GraphApolloProvider>
       </body>
     </html>
   )

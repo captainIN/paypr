@@ -5,6 +5,21 @@ import { ethers } from 'ethers'
 import axios from 'axios'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000'
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x1afd0Ec4340845c8E317F7B56489d08A48bAB2E4'
+const PYUSD_ADDRESS = '0x637A1259C6afd7E3AdF63993cA7E58BB438aB1B1'
+
+// Contract ABIs
+const PYUSD_ABI = [
+  'function approve(address spender, uint256 amount) external returns (bool)',
+  'function allowance(address owner, address spender) external view returns (uint256)',
+  'function balanceOf(address account) external view returns (uint256)',
+  'function decimals() external view returns (uint8)'
+]
+
+const PAYPR_ABI = [
+  'function depositFunds(string calldata repoName, uint256 amount) external',
+  'function getRepository(string calldata repoName) external view returns (tuple(address maintainer, uint256 bountyAmount, uint256 totalFunds, bool active))'
+]
 
 interface Payment {
   id: number
@@ -38,6 +53,14 @@ export default function Home() {
   // Form states
   const [repoName, setRepoName] = useState<string>('')
   const [githubUsername, setGithubUsername] = useState<string>('')
+  const [fundingAmount, setFundingAmount] = useState<string>('')
+  const [selectedRepo, setSelectedRepo] = useState<string>('')
+
+  // Funding states
+  const [pyusdBalance, setPyusdBalance] = useState<string>('0')
+  const [pyusdAllowance, setPyusdAllowance] = useState<string>('0')
+  const [repoBalance, setRepoBalance] = useState<string>('0')
+  const [repoActive, setRepoActive] = useState<boolean>(false)
 
   useEffect(() => {
     loadData()
@@ -178,18 +201,27 @@ export default function Home() {
   return (
     <div className="App">
       <header className="header">
-        <h1>🚀 PayPR</h1>
-        <p>Automated PYUSD payments for GitHub PR merges</p>
-
-        {!account ? (
-          <button onClick={connectWallet} disabled={loading} className="connect-btn">
-            {loading ? 'Connecting...' : 'Connect Wallet'}
-          </button>
-        ) : (
-          <div className="wallet-info">
-            <span>Connected: {account.slice(0, 6)}...{account.slice(-4)}</span>
+        <div className="header-content">
+          <div>
+            <h1>🚀 PayPR</h1>
+            <p>Automated PYUSD payments for GitHub PR merges</p>
           </div>
-        )}
+
+          <nav className="nav-links">
+            <a href="/" className="nav-link">Home</a>
+            <a href="/analytics" className="nav-link">📊 Analytics</a>
+          </nav>
+
+          {!account ? (
+            <button onClick={connectWallet} disabled={loading} className="connect-btn">
+              {loading ? 'Connecting...' : 'Connect Wallet'}
+            </button>
+          ) : (
+            <div className="wallet-info">
+              <span>Connected: {account.slice(0, 6)}...{account.slice(-4)}</span>
+            </div>
+          )}
+        </div>
       </header>
 
       <div className="container">
