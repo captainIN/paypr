@@ -17,8 +17,11 @@ const PYUSD_ABI = [
 ]
 
 const PAYPR_ABI = [
+  'function registerRepository(string calldata repoName, uint256 bountyAmount) external',
   'function depositFunds(string calldata repoName, uint256 amount) external',
-  'function getRepository(string calldata repoName) external view returns (tuple(address maintainer, uint256 bountyAmount, uint256 totalFunds, bool active))'
+  'function registerDeveloper(string calldata githubUsername) external',
+  'function getRepository(string calldata repoName) external view returns (tuple(address maintainer, uint256 bountyAmount, uint256 totalFunds, bool active))',
+  'function getDeveloper(address developer) external view returns (tuple(string githubUsername, bool registered))'
 ]
 
 interface Payment {
@@ -54,6 +57,7 @@ export default function Home() {
   const [repoName, setRepoName] = useState<string>('')
   const [githubUsername, setGithubUsername] = useState<string>('')
   const [fundingAmount, setFundingAmount] = useState<string>('')
+  const [bountyAmount, setBountyAmount] = useState<string>('1')
   const [selectedRepo, setSelectedRepo] = useState<string>('')
 
   // Funding states
@@ -68,6 +72,12 @@ export default function Home() {
     return () => clearInterval(interval)
   }, [])
 
+  useEffect(() => {
+    if (account) {
+      loadBalances()
+    }
+  }, [account, selectedRepo])
+
   const loadData = async () => {
     try {
       const [paymentsRes, reposRes, devsRes] = await Promise.all([
@@ -81,6 +91,38 @@ export default function Home() {
       setDevelopers(devsRes.data)
     } catch (error) {
       console.error('Error loading data:', error)
+    }
+  }
+
+  const loadBalances = async () => {
+    if (!account || !window.ethereum) return
+
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const pyusdContract = new ethers.Contract(PYUSD_ADDRESS, PYUSD_ABI, provider)
+      const payprContract = new ethers.Contract(CONTRACT_ADDRESS, PAYPR_ABI, provider)
+
+      // Load PYUSD balance and allowance
+      const balance = await pyusdContract.balanceOf(account)
+      const allowance = await pyusdContract.allowance(account, CONTRACT_ADDRESS)
+
+      setPyusdBalance(ethers.formatUnits(balance, 6))
+      setPyusdAllowance(ethers.formatUnits(allowance, 6))
+
+      // Load repository balance if a repo is selected
+      if (selectedRepo) {
+        try {
+          const repoData = await payprContract.getRepository(selectedRepo)
+          setRepoBalance(ethers.formatUnits(repoData.totalFunds, 6))
+          setRepoActive(repoData.active)
+        } catch (error) {
+          console.log('Repository not found on-chain:', selectedRepo)
+          setRepoBalance('0')
+          setRepoActive(false)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading balances:', error)
     }
   }
 
@@ -133,18 +175,50 @@ export default function Home() {
   }
 
   const registerRepository = async () => {
-    if (!account || !repoName) return
+    if (!account || !repoName || !fundingAmount || !bountyAmount) return
 
     try {
       setLoading(true)
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const signer = await provider.getSigner()
+
+      const pyusdContract = new ethers.Contract(PYUSD_ADDRESS, PYUSD_ABI, signer)
+      const payprContract = new ethers.Contract(CONTRACT_ADDRESS, PAYPR_ABI, signer)
+
+      const fundAmount = ethers.parseUnits(fundingAmount, 6) // PYUSD has 6 decimals
+      const bountyAmountParsed = ethers.parseUnits(bountyAmount, 6)
+
+      // First register the repository with bounty amount
+      alert('Registering repository on-chain...')
+      const registerTx = await payprContract.registerRepository(repoName, bountyAmountParsed)
+      await registerTx.wait()
+
+      // Check allowance for funding
+      const currentAllowance = await pyusdContract.allowance(account, CONTRACT_ADDRESS)
+
+      if (currentAllowance < fundAmount) {
+        alert('Approving PYUSD spending...')
+        const approveTx = await pyusdContract.approve(CONTRACT_ADDRESS, fundAmount)
+        await approveTx.wait()
+      }
+
+      // Deposit funds
+      alert('Depositing funds...')
+      const depositTx = await payprContract.depositFunds(repoName, fundAmount)
+      await depositTx.wait()
+
+      // Also register in backend database
       await axios.post(`${BACKEND_URL}/api/register-repository`, {
         repoName,
         maintainerAddress: account
       })
 
-      alert('Repository registered successfully!')
+      alert('Repository registered and funded successfully!')
       setRepoName('')
+      setFundingAmount('')
+      setBountyAmount('1')
       loadData()
+      loadBalances()
     } catch (error) {
       console.error('Registration failed:', error)
       alert('Registration failed: ' + (error as any).message)
@@ -158,6 +232,17 @@ export default function Home() {
 
     try {
       setLoading(true)
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const signer = await provider.getSigner()
+
+      const payprContract = new ethers.Contract(CONTRACT_ADDRESS, PAYPR_ABI, signer)
+
+      // Register developer on-chain
+      alert('Registering developer on-chain...')
+      const registerTx = await payprContract.registerDeveloper(githubUsername)
+      await registerTx.wait()
+
+      // Also register in backend database
       await axios.post(`${BACKEND_URL}/api/register-developer`, {
         githubUsername,
         walletAddress: account
@@ -203,13 +288,21 @@ export default function Home() {
       <header className="header">
         <div className="header-content">
           <div>
-            <h1>🚀 PayPR</h1>
-            <p>Automated PYUSD payments for GitHub PR merges</p>
+            <img
+              src="/paypr_logo.png"
+              alt="Paypr"
+              style={{
+                height: '100px',
+                width: 'auto',
+                marginBottom: '0.5rem'
+              }}
+            />
+
           </div>
 
           <nav className="nav-links">
             <a href="/" className="nav-link">Home</a>
-            <a href="/analytics" className="nav-link">📊 Analytics</a>
+            <a href="/analytics" className="nav-link">Analytics</a>
           </nav>
 
           {!account ? (
@@ -225,11 +318,36 @@ export default function Home() {
       </header>
 
       <div className="container">
-        {account && (
+        {!account ? (
+          <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '2rem', borderRadius: '12px', textAlign: 'center' }}>
+            <h2 style={{ margin: '0 0 1rem 0', color: '#FFD700' }}>🔗 Connect Your Wallet</h2>
+            <p style={{ margin: '0 0 1.5rem 0', fontSize: '1.1rem', opacity: 0.9 }}>
+              Connect your wallet to start using paypr for automated GitHub payments
+            </p>
+            <button onClick={connectWallet} disabled={loading} className="connect-btn">
+              {loading ? 'Connecting...' : 'Connect Wallet'}
+            </button>
+          </div>
+        ) : (
           <>
+            <div style={{ background: 'rgba(255, 255, 255, 0.1)', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', textAlign: 'center' }}>
+              <h2 style={{ margin: '0 0 1rem 0', color: '#FFD700' }}>Howdy!</h2>
+              <p style={{ margin: '0', fontSize: '1rem', opacity: 0.9 }}>
+                <strong>Repository Owners:</strong> Register your repo and fund it to enable automatic payments.<br />
+                <strong>Developers:</strong> Register your GitHub username to receive payments when your PRs are merged.
+              </p>
+            </div>
             <div className="forms-section">
               <div className="form-card">
-                <h3>Register Repository</h3>
+                <h3>🏗️ Repository Maintainer</h3>
+                <div style={{ background: 'rgba(76, 175, 80, 0.2)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                  <strong>For Repository Owners:</strong><br />
+                  Register your GitHub repository to enable automatic PYUSD payments when PRs are merged.
+                  Set the bounty amount per PR and add initial funding.
+                </div>
+                <p style={{ fontSize: '0.9rem', opacity: 0.8, marginBottom: '1rem' }}>
+                  Your PYUSD Balance: {pyusdBalance} PYUSD
+                </p>
                 <input
                   type="text"
                   placeholder="owner/repository"
@@ -237,20 +355,43 @@ export default function Home() {
                   onChange={(e) => setRepoName(e.target.value)}
                   className="input"
                 />
+                <input
+                  type="number"
+                  placeholder="Bounty per PR (PYUSD)"
+                  value={bountyAmount}
+                  onChange={(e) => setBountyAmount(e.target.value)}
+                  className="input"
+                  min="0.1"
+                  step="0.1"
+                />
+                <input
+                  type="number"
+                  placeholder="Initial funding (PYUSD)"
+                  value={fundingAmount}
+                  onChange={(e) => setFundingAmount(e.target.value)}
+                  className="input"
+                  min="1"
+                  step="0.1"
+                />
                 <button
                   onClick={registerRepository}
-                  disabled={loading || !repoName}
+                  disabled={loading || !repoName || !fundingAmount || !bountyAmount || parseFloat(fundingAmount) <= 0 || parseFloat(bountyAmount) <= 0}
                   className="btn primary"
                 >
-                  Register Repository (1 PYUSD per PR)
+                  Register & Fund Repository
                 </button>
               </div>
 
               <div className="form-card">
-                <h3>Register Developer</h3>
+                <h3>👨‍💻 Developer Registration</h3>
+                <div style={{ background: 'rgba(33, 150, 243, 0.2)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                  <strong>For Contributors:</strong><br />
+                  Link your GitHub account to this wallet to receive automatic PYUSD payments
+                  when your pull requests are merged in registered repositories.
+                </div>
                 <input
                   type="text"
-                  placeholder="GitHub username"
+                  placeholder="Your GitHub username"
                   value={githubUsername}
                   onChange={(e) => setGithubUsername(e.target.value)}
                   className="input"
@@ -260,24 +401,44 @@ export default function Home() {
                   disabled={loading || !githubUsername}
                   className="btn primary"
                 >
-                  Register Developer
+                  Register as Developer
                 </button>
               </div>
 
               <div className="form-card">
-                <h3>Demo Test</h3>
-                <p>Simulate a PR payment</p>
+                <h3>🧪 Demo Test</h3>
+                <div style={{ background: 'rgba(255, 152, 0, 0.2)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                  <strong>For Testing:</strong><br />
+                  Simulate a PR merge payment to test the system. Requires at least one
+                  registered repository and developer.
+                </div>
                 <button
                   onClick={testPayment}
-                  disabled={loading}
+                  disabled={loading || repositories.length === 0 || developers.length === 0}
                   className="btn secondary"
                 >
-                  Test Payment
+                  {repositories.length === 0 || developers.length === 0 ?
+                    'Register Repo & Developer First' :
+                    'Test Payment Flow'
+                  }
                 </button>
               </div>
             </div>
 
             <div className="stats-section">
+              <div className="stat-card">
+                <h4>Your Wallet</h4>
+                <div className="stat-item">
+                  💰 PYUSD: {parseFloat(pyusdBalance).toFixed(2)}
+                </div>
+                <div className="stat-item">
+                  ✅ Allowance: {parseFloat(pyusdAllowance).toFixed(2)}
+                </div>
+                <div className="stat-item">
+                  📱 {account.slice(0, 6)}...{account.slice(-4)}
+                </div>
+              </div>
+
               <div className="stat-card">
                 <h4>Repositories</h4>
                 <div className="stat-number">{repositories.length}</div>
@@ -342,9 +503,7 @@ export default function Home() {
         )}
 
         <footer className="footer">
-          <p>🏗️ Built for Hackathon - Powered by PYUSD & The Graph</p>
-          <p>Webhook URL: <code>{BACKEND_URL}/webhook/github</code></p>
-          <p>Contract: <code>0x1afd0Ec4340845c8E317F7B56489d08A48bAB2E4</code></p>
+          <p>Contract: <code>{process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}</code></p>
         </footer>
       </div>
     </div>

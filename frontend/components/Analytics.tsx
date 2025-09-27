@@ -62,21 +62,57 @@ export default function Analytics() {
 
   if (overviewLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading analytics...</p>
+      <div className="App" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: '50px',
+            height: '50px',
+            border: '3px solid rgba(255,255,255,0.3)',
+            borderTop: '3px solid #fff',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 1rem'
+          }}></div>
+          <p style={{ color: 'white', opacity: 0.8 }}>Loading analytics...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">PayPR Analytics</h1>
-          <p className="mt-2 text-gray-600">Real-time blockchain analytics powered by The Graph</p>
+    <div className="App">
+      <header className="header">
+        <div className="header-content">
+          <div>
+            <img
+              src="/paypr_logo.png"
+              alt="Paypr"
+              style={{
+                height: '100px',
+                width: 'auto',
+                marginBottom: '0.5rem'
+              }}
+            />
+          </div>
+          <nav className="nav-links">
+            <a href="/" className="nav-link">Home</a>
+            <a href="/analytics" className="nav-link">Analytics</a>
+          </nav>
+        </div>
+      </header>
+
+      <div className="container">
+        <div style={{
+          background: 'rgba(255, 255, 255, 0.1)',
+          padding: '2rem',
+          borderRadius: '12px',
+          textAlign: 'center',
+          marginBottom: '2rem'
+        }}>
+          <h1 style={{ margin: '0 0 1rem 0', fontSize: '2.5rem', color: '#FFD700' }}>📊 PayPR Analytics</h1>
+          <p style={{ margin: '0', fontSize: '1.1rem', opacity: 0.9 }}>
+            Real-time blockchain analytics powered by The Graph Protocol
+          </p>
         </div>
 
         {/* Overview Stats */}

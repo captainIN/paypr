@@ -3,7 +3,7 @@ import './globals.css'
 import GraphApolloProvider from '../components/ApolloProvider'
 
 export const metadata: Metadata = {
-  title: 'PayPR - Automated PYUSD Payments for GitHub PRs',
+  title: 'paypr - Automated PYUSD Payments for GitHub PRs',
   description: 'Blockchain-powered payments for GitHub pull request merges using PYUSD on Arbitrum',
 }
 
