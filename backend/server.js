@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const { ethers } = require("ethers");
+const crypto = require("crypto");
 require("dotenv").config();
 
 const app = express();
@@ -12,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 // Environment variables
-const { ARBITRUM_SEPOLIA_RPC_URL, PRIVATE_KEY, CONTRACT_ADDRESS } = process.env;
+const { ARBITRUM_SEPOLIA_RPC_URL, PRIVATE_KEY, CONTRACT_ADDRESS, GITHUB_WEBHOOK_SECRET } = process.env;
 
 // Contract setup
 const CONTRACT_ABI = [
@@ -45,34 +46,86 @@ app.get("/", (req, res) => {
   res.json({ message: "PayPR Backend API", status: "running" });
 });
 
-// GitHub webhook handler (simplified for demo)
+// Webhook signature verification
+function verifyWebhookSignature(payload, signature, secret) {
+  if (!secret) return true; // Skip verification if no secret configured
+
+  const hmac = crypto.createHmac('sha256', secret);
+  const digest = 'sha256=' + hmac.update(payload, 'utf8').digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+}
+
+// GitHub webhook handler
 app.post("/webhook/github", async (req, res) => {
   try {
-    console.log("Webhook received:", JSON.stringify(req.body, null, 2));
+    console.log("\n🔔 GitHub Webhook received");
+
+    // Verify webhook signature if secret is configured
+    if (GITHUB_WEBHOOK_SECRET) {
+      const signature = req.headers['x-hub-signature-256'];
+      if (!signature || !verifyWebhookSignature(JSON.stringify(req.body), signature, GITHUB_WEBHOOK_SECRET)) {
+        console.log("❌ Invalid webhook signature");
+        return res.status(401).send("Unauthorized");
+      }
+      console.log("✅ Webhook signature verified");
+    }
+
+    console.log("Headers:", req.headers);
 
     const { action, pull_request, repository } = req.body;
 
+    // Log basic webhook info
+    console.log(`Action: ${action}`);
+    console.log(`Repository: ${repository?.full_name}`);
+    console.log(`PR: #${pull_request?.number} by ${pull_request?.user?.login}`);
+
+    // Check if this is a PR merge event
     if (action === "closed" && pull_request?.merged) {
       const repoName = repository.full_name;
       const developer = pull_request.user.login;
       const prNumber = pull_request.number;
+      const mergedAt = pull_request.merged_at;
 
-      console.log(
-        `Processing PR merge: ${repoName} by ${developer} (PR #${prNumber})`
-      );
+      console.log("\n🎉 PR MERGED EVENT DETECTED!");
+      console.log(`Repository: ${repoName}`);
+      console.log(`Developer: ${developer}`);
+      console.log(`PR Number: #${prNumber}`);
+      console.log(`Merged at: ${mergedAt}`);
+      console.log(`PR Title: ${pull_request.title}`);
 
-      // Check if repo and developer are registered
-      if (repositories.has(repoName) && developers.has(developer)) {
-        await processPRPayment(repoName, developer, prNumber);
-      } else {
-        console.log("Repository or developer not registered");
+      // Enhanced validation
+      if (!repoName || !developer || !prNumber) {
+        console.log("❌ Missing required data in webhook payload");
+        return res.status(400).send("Invalid webhook payload");
       }
+
+      // Check if repo and developer are registered (in memory check first)
+      const repoRegistered = repositories.has(repoName);
+      const devRegistered = developers.has(developer);
+
+      console.log(`Repository registered in memory: ${repoRegistered}`);
+      console.log(`Developer registered in memory: ${devRegistered}`);
+
+      // Process payment regardless of memory state - let contract handle validation
+      console.log("\n🚀 Initiating payment process...");
+      await processPRPayment(repoName, developer, prNumber);
+
+    } else if (action === "opened") {
+      console.log(`📝 New PR opened: ${repository.full_name}#${pull_request.number}`);
+    } else if (action === "closed" && !pull_request?.merged) {
+      console.log(`❌ PR closed without merge: ${repository.full_name}#${pull_request.number}`);
+    } else {
+      console.log(`ℹ️ Unhandled webhook action: ${action}`);
     }
 
-    res.status(200).send("OK");
+    res.status(200).json({
+      status: "received",
+      action,
+      processed: action === "closed" && pull_request?.merged
+    });
   } catch (error) {
-    console.error("Webhook error:", error);
-    res.status(500).send("Internal Server Error");
+    console.error("❌ Webhook processing error:", error);
+    res.status(500).json({ error: "Internal Server Error", message: error.message });
   }
 });
 
@@ -95,13 +148,56 @@ async function processPRPayment(repoName, developer, prNumber) {
     }
 
     console.log(
-      `Processing payment: ${repoName} -> ${developer} (PR #${prNumber})`
+      `🚀 Processing blockchain payment: ${repoName} -> ${developer} (PR #${prNumber})`
     );
 
-    const tx = await contract.processPRPayment(repoName, developer, prNumber);
-    const receipt = await tx.wait();
+    // Check if repository and developer are registered on-chain
+    try {
+      const repoData = await contract.getRepository(repoName);
+      if (!repoData.active) {
+        console.log(`❌ Repository ${repoName} not active on-chain`);
+        return;
+      }
+      console.log(`✅ Repository verified: ${repoData.bountyAmount} PYUSD bounty`);
+    } catch (error) {
+      console.log(`❌ Repository ${repoName} not found on-chain:`, error.message);
+      return;
+    }
 
-    console.log(`Payment successful: ${receipt.hash}`);
+    try {
+      const devData = await contract.getDeveloper(developer);
+      if (devData.wallet === ethers.ZeroAddress) {
+        console.log(`❌ Developer ${developer} not registered on-chain`);
+        return;
+      }
+      console.log(`✅ Developer verified: ${devData.wallet}`);
+    } catch (error) {
+      console.log(`❌ Developer ${developer} not found on-chain:`, error.message);
+      return;
+    }
+
+    // Process the payment on blockchain
+    console.log("📝 Calling contract.processPRPayment...");
+    const tx = await contract.processPRPayment(repoName, developer, prNumber);
+    console.log(`⏳ Transaction submitted: ${tx.hash}`);
+
+    const receipt = await tx.wait();
+    console.log(`✅ Payment successful! Block: ${receipt.blockNumber}, Gas used: ${receipt.gasUsed}`);
+
+    // Extract payment amount from BountyPaid event
+    let paymentAmount = "1000000"; // Default fallback
+    for (const log of receipt.logs) {
+      try {
+        const parsedLog = contract.interface.parseLog(log);
+        if (parsedLog.name === "BountyPaid") {
+          paymentAmount = parsedLog.args.amount.toString();
+          console.log(`💰 Payment amount from event: ${ethers.formatUnits(paymentAmount, 6)} PYUSD`);
+          break;
+        }
+      } catch (e) {
+        // Skip logs that aren't from our contract
+      }
+    }
 
     // Store payment info
     const payment = {
@@ -109,13 +205,24 @@ async function processPRPayment(repoName, developer, prNumber) {
       repoName,
       developer,
       prNumber,
-      amount: "1000000", // 1 PYUSD
+      amount: paymentAmount,
       timestamp: Date.now(),
       txHash: receipt.hash,
+      blockNumber: receipt.blockNumber,
     };
     payments.push(payment);
+
+    console.log(`🎉 Payment recorded:`, payment);
   } catch (error) {
-    console.error("Payment processing error:", error);
+    console.error("❌ Payment processing error:", error.message);
+
+    // If it's a known contract error, log more details
+    if (error.reason) {
+      console.error("Contract error reason:", error.reason);
+    }
+    if (error.code) {
+      console.error("Error code:", error.code);
+    }
   }
 }
 
@@ -207,11 +314,41 @@ app.get("/api/developers", async (req, res) => {
 app.post("/api/test-payment", async (req, res) => {
   try {
     const { repoName, developer, prNumber } = req.body;
-    await processPRPayment(repoName, developer, prNumber || 999);
-    res.json({ success: true, message: "Test payment processed" });
+
+    console.log("\n🧪 TEST PAYMENT INITIATED");
+    console.log(`Repository: ${repoName || repositories.keys().next().value}`);
+    console.log(`Developer: ${developer || developers.keys().next().value}`);
+    console.log(`PR Number: ${prNumber || 999}`);
+
+    await processPRPayment(
+      repoName || repositories.keys().next().value,
+      developer || developers.keys().next().value,
+      prNumber || 999
+    );
+
+    res.json({
+      success: true,
+      message: "Test payment processed",
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
+    console.error("❌ Test payment error:", error);
     res.status(500).json({ error: error.message });
   }
+});
+
+// Webhook status endpoint
+app.get("/api/webhook-status", (req, res) => {
+  res.json({
+    contract_configured: !!contract,
+    contract_address: CONTRACT_ADDRESS,
+    rpc_url: ARBITRUM_SEPOLIA_RPC_URL,
+    registered_repositories: repositories.size,
+    registered_developers: developers.size,
+    total_payments: payments.length,
+    last_payment: payments[payments.length - 1] || null,
+    webhook_url: `${req.protocol}://${req.get('host')}/webhook/github`
+  });
 });
 
 app.listen(PORT, () => {
