@@ -52,32 +52,61 @@ export default function Analytics() {
     return new Date(parseInt(timestamp) * 1000).toLocaleDateString();
   };
 
-  const decodeString = (encodedString: string) => {
+  const decodeString = (encodedString: string, fallbackType: 'repo' | 'username' | 'generic' = 'generic') => {
     try {
       // If it's already readable text, return as is
       if (/^[a-zA-Z0-9\-_/.]+$/.test(encodedString)) {
         return encodedString;
       }
 
-      // Try to decode from bytes if it's encoded
-      if (encodedString.startsWith('0x')) {
-        return ethers.toUtf8String(encodedString);
-      }
+      // Check if string contains mostly non-printable characters
+      const nonPrintableCount = (encodedString.match(/[\x00-\x1F\x7F-\x9F]/g) || []).length;
+      const totalLength = encodedString.length;
 
-      // If it looks like bytes but without 0x prefix
-      const hexString = encodedString.replace(/[^a-fA-F0-9]/g, '');
-      if (hexString.length > 0 && hexString.length % 2 === 0) {
-        try {
-          return ethers.toUtf8String('0x' + hexString);
-        } catch {
-          return encodedString; // Return original if decode fails
+      if (nonPrintableCount > totalLength * 0.3) {
+        // Too many non-printable characters, return fallback
+        switch (fallbackType) {
+          case 'repo':
+            return '[Repository Name]';
+          case 'username':
+            return '[GitHub User]';
+          default:
+            return '[Encoded Data]';
         }
       }
 
-      return encodedString;
+      // Try to decode from bytes if it's encoded
+      if (encodedString.startsWith('0x')) {
+        try {
+          const decoded = ethers.toUtf8String(encodedString);
+          // Validate decoded string
+          if (/^[a-zA-Z0-9\-_/.]+$/.test(decoded)) {
+            return decoded;
+          }
+        } catch {
+          // Fall through to fallback
+        }
+      }
+
+      // If we reach here, return a user-friendly fallback
+      switch (fallbackType) {
+        case 'repo':
+          return '[Repository Name]';
+        case 'username':
+          return '[GitHub User]';
+        default:
+          return '[Encoded Data]';
+      }
     } catch (error) {
       console.log('String decode failed:', error);
-      return encodedString; // Return original string if decoding fails
+      switch (fallbackType) {
+        case 'repo':
+          return '[Repository Name]';
+        case 'username':
+          return '[GitHub User]';
+        default:
+          return '[Encoded Data]';
+      }
     }
   };
 
@@ -131,7 +160,17 @@ export default function Analytics() {
       </header>
 
       <div className="container">
-
+        <div style={{
+          background: 'rgba(255, 193, 7, 0.2)',
+          padding: '1rem',
+          borderRadius: '8px',
+          textAlign: 'center',
+          marginBottom: '2rem',
+          fontSize: '0.9rem',
+          opacity: 0.9
+        }}>
+          ℹ️ Note: Some data may display as placeholders ([Repository Name], [GitHub User]) due to encoding from The Graph subgraph
+        </div>
 
         {/* Overview Stats */}
         <div className="stats-section">
@@ -186,8 +225,8 @@ export default function Analytics() {
                       </span>
                     </div>
                     <div className="payment-details">
-                      <div>👨‍💻 {decodeString(payment.developerGithub)}</div>
-                      <div>📁 {decodeString(payment.repoName)}</div>
+                      <div>👨‍💻 {decodeString(payment.developerGithub, 'username')}</div>
+                      <div>📁 {decodeString(payment.repoName, 'repo')}</div>
                       <div>🔗 PR #{payment.prNumber}</div>
                       <div>
                         <a
@@ -226,7 +265,7 @@ export default function Analytics() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
                 {developersData.developerRegistereds.slice(0, 8).map((developer: Developer, index: number) => (
                   <div key={developer.id} className="stat-card">
-                    <h4>#{index + 1} {decodeString(developer.githubUsername)}</h4>
+                    <h4>#{index + 1} {decodeString(developer.githubUsername, 'username')}</h4>
                     <div className="stat-item">
                       📱 {developer.wallet.slice(0, 6)}...{developer.wallet.slice(-4)}
                     </div>
@@ -261,7 +300,7 @@ export default function Analytics() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1rem' }}>
               {reposData.repositoryRegistereds.map((repo: Repository) => (
                 <div key={repo.id} className="stat-card">
-                  <h4>📁 {decodeString(repo.repoName)}</h4>
+                  <h4>📁 {decodeString(repo.repoName, 'repo')}</h4>
                   <div className="stat-item">
                     👨‍💻 {repo.maintainer.slice(0, 6)}...{repo.maintainer.slice(-4)}
                   </div>

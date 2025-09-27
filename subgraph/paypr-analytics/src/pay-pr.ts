@@ -15,7 +15,7 @@ export function handleBountyPaid(event: BountyPaidEvent): void {
   let entity = new BountyPaid(
     event.transaction.hash.concatI32(event.logIndex.toI32())
   )
-  entity.repoName = event.params.repoName.toString().toString()
+  entity.repoName = event.params.repoName.toString()
   entity.developerGithub = event.params.developerGithub.toString()
   entity.prNumber = event.params.prNumber
   entity.amount = event.params.amount

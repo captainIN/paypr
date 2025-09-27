@@ -5,7 +5,7 @@ import { ethers } from 'ethers'
 import axios from 'axios'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000'
-const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0x1afd0Ec4340845c8E317F7B56489d08A48bAB2E4'
+const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || '0xA9852D119cCDf5Ff0c3C6b450bA129B8b5219B30'
 const PYUSD_ADDRESS = '0x637A1259C6afd7E3AdF63993cA7E58BB438aB1B1'
 
 // Contract ABIs
@@ -52,6 +52,7 @@ export default function Home() {
   const [repositories, setRepositories] = useState<Repository[]>([])
   const [developers, setDevelopers] = useState<Developer[]>([])
   const [loading, setLoading] = useState<boolean>(false)
+  const [webhookGuideOpen, setWebhookGuideOpen] = useState<boolean>(false)
 
   // Form states
   const [repoName, setRepoName] = useState<string>('')
@@ -345,6 +346,60 @@ export default function Home() {
                   Register your GitHub repository to enable automatic PYUSD payments when PRs are merged.
                   Set the bounty amount per PR and add initial funding.
                 </div>
+
+                <div style={{ background: 'rgba(255, 193, 7, 0.15)', border: '1px solid rgba(255, 193, 7, 0.3)', borderRadius: '8px', marginBottom: '1rem' }}>
+                  <button
+                    onClick={() => setWebhookGuideOpen(!webhookGuideOpen)}
+                    style={{
+                      width: '100%',
+                      background: 'transparent',
+                      border: 'none',
+                      padding: '1rem',
+                      color: '#FFD700',
+                      fontSize: '0.9rem',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    <span>⚙️ Required: GitHub Webhook Setup</span>
+                    <span style={{ transform: webhookGuideOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s' }}>▼</span>
+                  </button>
+
+                  {webhookGuideOpen && (
+                    <div style={{ padding: '0 1rem 1rem', fontSize: '0.85rem', lineHeight: '1.6' }}>
+                      <p style={{ margin: '0 0 1rem 0', fontWeight: 'bold' }}>After registering below, configure your GitHub repository webhook:</p>
+
+                      <div style={{ background: 'rgba(0, 0, 0, 0.2)', padding: '1rem', borderRadius: '6px', marginBottom: '1rem', lineHeight: '1.8' }}>
+                        <div style={{ marginBottom: '0.8rem' }}><strong>1. Go to your GitHub repository</strong></div>
+                        <div style={{ marginBottom: '0.8rem' }}><strong>2. Navigate to:</strong> Settings → Webhooks → Add webhook</div>
+                        <div style={{ marginBottom: '0.8rem' }}><strong>3. Enter these values:</strong></div>
+                        <div style={{ paddingLeft: '1rem', lineHeight: '2' }}>
+                          <div style={{ marginBottom: '0.5rem' }}>• <strong>Payload URL:</strong><br />
+                            <code style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 8px', borderRadius: '3px', fontSize: '0.8rem', wordBreak: 'break-all' }}>
+                              https://paypr-production.up.railway.app/webhook/github
+                            </code>
+                          </div>
+                          <div style={{ marginBottom: '0.5rem' }}>• <strong>Content type:</strong> application/json</div>
+                          <div style={{ marginBottom: '0.5rem' }}>• <strong>Secret:</strong><br />
+                            <code style={{ background: 'rgba(255,255,255,0.2)', padding: '4px 8px', borderRadius: '3px', fontSize: '0.8rem' }}>
+                              my-safe-secret
+                            </code>
+                          </div>
+                          <div style={{ marginBottom: '0.5rem' }}>• <strong>Events:</strong> Select "Pull requests" only</div>
+                          <div>• <strong>Active:</strong> ✅ Check this box</div>
+                        </div>
+                      </div>
+
+                      <p style={{ margin: '0', fontSize: '0.8rem', opacity: '0.9', lineHeight: '1.5' }}>
+                        💡 <strong>Note:</strong> Without the webhook, payments won't trigger automatically when PRs are merged.
+                      </p>
+                    </div>
+                  )}
+                </div>
                 <p style={{ fontSize: '0.9rem', opacity: 0.8, marginBottom: '1rem' }}>
                   Your PYUSD Balance: {pyusdBalance} PYUSD
                 </p>
@@ -405,24 +460,6 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="form-card">
-                <h3>🧪 Demo Test</h3>
-                <div style={{ background: 'rgba(255, 152, 0, 0.2)', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.9rem' }}>
-                  <strong>For Testing:</strong><br />
-                  Simulate a PR merge payment to test the system. Requires at least one
-                  registered repository and developer.
-                </div>
-                <button
-                  onClick={testPayment}
-                  disabled={loading || repositories.length === 0 || developers.length === 0}
-                  className="btn secondary"
-                >
-                  {repositories.length === 0 || developers.length === 0 ?
-                    'Register Repo & Developer First' :
-                    'Test Payment Flow'
-                  }
-                </button>
-              </div>
             </div>
 
             <div className="stats-section">
